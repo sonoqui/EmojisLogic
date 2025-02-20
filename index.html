@@ -85,7 +85,7 @@
         let highScore = localStorage.getItem('highScore') || 0;
         document.getElementById('high-score').textContent = highScore;
 
-        const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3'); // Replace with your music file
+        const audio = new Audio('/tune.mid'); // Replace with your music file
         audio.loop = true;
 
         function getLevelConfig(level) {
