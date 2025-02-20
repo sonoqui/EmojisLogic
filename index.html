@@ -2,6 +2,7 @@
 <html>
 <head>
     <title>Emoji Mastermind</title>
+    <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.3/build/MidiPlayer.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -106,8 +107,6 @@
         </div>
     </div>
 
-    <audio id="background-music" loop src="tune.mid"></audio>
-
     <script>
         const emojiSet = [
             '😂', '🤓', '😎', '🥳', '🤯', '😭', '🤡', '👽', 
@@ -122,10 +121,17 @@
         let timeLeft = 0;
         let timerId = null;
         let highScore = localStorage.getItem('highScore') || 0;
-        let availableEmojis = []; // Persistent set per game
+        let availableEmojis = [];
         document.getElementById('high-score').textContent = highScore;
 
-        const audio = document.getElementById('background-music');
+        // Initialize MIDI Player
+        const audio = new MidiPlayer.Player();
+        audio.loadFile('https://sonoqui.github.io/EmojiLogic/tune.mid');
+        audio.on('midiEvent', (event) => {
+            if (event.name === 'Note on' && event.velocity > 0) {
+                // Use Web Audio API for sound if needed; default synth works in most browsers
+            }
+        });
 
         function getLevelConfig(level) {
             const baseLength = 3;
@@ -134,7 +140,7 @@
             const length = Math.min(Math.floor(baseLength + Math.log2(level) * 2), emojiSet.length);
             const attempts = Math.min(Math.max(baseAttempts + Math.floor(level / 3), 6), Math.max(10, Math.ceil(length * 1.5)));
             const timeReductionFactor = 1 - (Math.log(level + 1) / Math.log(50));
-            const paletteSize = Math.min(length + Math.floor(level / 5) + 2, emojiSet.length); // More emojis than spots
+            const paletteSize = Math.min(length + Math.floor(level / 5) + 2, emojiSet.length);
             return {
                 length: length,
                 attempts: attempts,
@@ -150,7 +156,7 @@
 
         function selectAvailableEmojis(paletteSize, combo) {
             const shuffled = [...emojiSet].sort(() => 0.5 - Math.random());
-            const available = new Set(combo); // Include all secret combo emojis
+            const available = new Set(combo);
             while (available.size < paletteSize) {
                 available.add(shuffled.pop());
             }
@@ -164,11 +170,11 @@
             secretCombo = generateCombo(config.length);
             maxAttempts = config.attempts;
             timeLeft = config.baseTime;
-            availableEmojis = selectAvailableEmojis(config.paletteSize, secretCombo); // Set once per game
+            availableEmojis = selectAvailableEmojis(config.paletteSize, secretCombo);
             renderGame();
             startTimer();
-            audio.playbackRate = 1;
-            audio.play(); // Plays after user click
+            audio.play(); // Starts after user interaction
+            audio.isLooping = true; // Loops the MIDI
             updateStatus();
         }
 
@@ -203,8 +209,8 @@
             const paletteDiv = document.getElementById('palette');
             paletteDiv.innerHTML = '';
             const config = getLevelConfig(currentLevel);
-            const cellWidth = 70; // Width + margin (60px + 10px)
-            paletteDiv.style.width = `${config.length * cellWidth}px`; // Match row width
+            const cellWidth = 70; // Width + margin
+            paletteDiv.style.width = `${config.length * cellWidth}px`;
             availableEmojis.forEach(emoji => {
                 const div = document.createElement('div');
                 div.className = 'palette-emoji';
@@ -275,7 +281,7 @@
                 else if (percentage > 10) progressBar.style.backgroundColor = 'orange';
                 else progressBar.style.backgroundColor = 'red';
 
-                audio.playbackRate = 1 + (1 - percentage / 100) * 0.5;
+                audio.tempo = 140 + (1 - percentage / 100) * 70; // Adjust MIDI tempo (140-210 BPM)
 
                 if (timeLeft <= 0) {
                     strikes++;
@@ -304,7 +310,7 @@
 
         function endGame(won) {
             clearInterval(timerId);
-            audio.pause();
+            audio.stop();
             
             const score = won ? Math.round((currentLevel * 1000) / (currentAttempt + 1)) : 0;
             if (score > highScore) {
