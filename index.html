@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Emoji Mastermind</title>
-    <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/build/index.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/midi-player-js@2.0.16/dist/midi-player.min.js"></script>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -126,11 +126,14 @@
 
         // Initialize MIDI Player
         const audio = new MidiPlayer.Player();
-        audio.loadFile('https://sonoqui.github.io/EmojiLogic/tune.mid');
+        audio.loadFile('https://yourusername.github.io/emoji-game/output.mid'); // Replace with your hosted MIDI URL
         audio.on('midiEvent', (event) => {
             if (event.name === 'Note on' && event.velocity > 0) {
-                // Use Web Audio API for sound if needed; default synth works in most browsers
+                // Default browser synth handles playback
             }
+        });
+        audio.on('endOfFile', () => {
+            audio.play(); // Manual looping
         });
 
         function getLevelConfig(level) {
@@ -174,7 +177,6 @@
             renderGame();
             startTimer();
             audio.play(); // Starts after user interaction
-            audio.isLooping = true; // Loops the MIDI
             updateStatus();
         }
 
@@ -281,7 +283,7 @@
                 else if (percentage > 10) progressBar.style.backgroundColor = 'orange';
                 else progressBar.style.backgroundColor = 'red';
 
-                audio.tempo = 140 + (1 - percentage / 100) * 70; // Adjust MIDI tempo (140-210 BPM)
+                audio.tempo = 140 + (1 - percentage / 100) * 70; // Adjust tempo 140-210 BPM
 
                 if (timeLeft <= 0) {
                     strikes++;
