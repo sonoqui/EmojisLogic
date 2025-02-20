@@ -1,0 +1,17 @@
+# Creative MIDI Tune: "Emoji Dance Loop"
+# Format: Note, Octave, Velocity (0-127), Duration (quarter notes)
+# Time: 4/4, 140 BPM (428571 microseconds per beat)
+# Designed to loop smoothly
+
+G4, 110, 0.5    # Quick G kickoff
+E5, 115, 0.5    # High E bounce
+F4, 100, 1      # Funky F drop
+A4, 105, 0.75   # Offbeat A
+C5, 120, 0.25   # Fast C jab
+E5, 115, 0.5    # E again for flair
+D5, 110, 0.5    # D twist
+B4, 100, 1      # B lands solid
+G4, 110, 1      # G resolves low
+A4, 105, 0.75   # A lifts up
+F4, 100, 0.75   # F dips
+G4, 110, 1.5    # G ties back to start

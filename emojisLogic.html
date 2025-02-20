@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Emoji Mastermind</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background: #f0f0f0;
+        }
+        #game-container {
+            max-width: 800px;
+            margin: 20px auto;
+        }
+        #progress-bar {
+            width: 100%;
+            height: 20px;
+            margin-bottom: 20px;
+            transition: background-color 0.3s;
+        }
+        .row {
+            display: flex;
+            justify-content: center;
+            margin: 10px 0;
+        }
+        .cell {
+            width: 60px;
+            height: 60px;
+            border: 2px solid #ccc;
+            margin: 0 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+            cursor: pointer;
+        }
+        .palette {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+        .palette-emoji {
+            width: 50px;
+            height: 50px;
+            font-size: 30px;
+            cursor: grab;
+        }
+        .disabled {
+            background: #ddd;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        #scoreboard {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div id="progress-bar"></div>
+        <div id="attempts"></div>
+        <div id="palette"></div>
+        <div id="scoreboard">
+            <h2>High Score: <span id="high-score">0</span></h2>
+        </div>
+        <button onclick="startNewGame()">New Game</button>
+    </div>
+
+    <audio id="background-music" loop></audio>
+
+    <script>
+        const emojiSet = [
+            '😂', '🤓', '😎', '🥳', '🤯', '😭', '🤡', '👽', 
+            '🥐', '🍕', '🍔', '🌮', '🍟', '🍦', '🎉', '💩', 
+            '👻', '🤖', '🐱', '🐶', '🦄', '🐙', '🐼', '🦁'
+        ];
+        let secretCombo = [];
+        let currentLevel = 1;
+        let currentAttempt = 0;
+        let maxAttempts = 0;
+        let strikes = 0;
+        let timeLeft = 0;
+        let timerId = null;
+        let highScore = localStorage.getItem('highScore') || 0;
+        document.getElementById('high-score').textContent = highScore;
+
+        const audio = new Audio('https://www.soundjay.com/buttons/beep-01a.mp3'); // Replace with your music file
+        audio.loop = true;
+
+        function getLevelConfig(level) {
+            // Dynamic calculation for infinite levels
+            const baseLength = 3; // Starting emoji length
+            const baseAttempts = 6; // Starting attempts
+            const baseTime = 30; // Starting time in seconds
+
+            // Length increases logarithmically, starting at 3 and capping growth
+            const length = Math.min(Math.floor(baseLength + Math.log2(level) * 2), emojiSet.length);
+
+            // Attempts grow slower than length, capped at 10 initially, then decreasing relative to length
+            const attempts = Math.min(
+                Math.max(baseAttempts + Math.floor(level / 3), 6), 
+                Math.max(10, Math.ceil(length * 1.5))
+            );
+
+            // Time decreases inversely with level, but never below 10s
+            const timeReductionFactor = 1 - (Math.log(level + 1) / Math.log(50)); // Smooth decay
+            const baseTimeAdjusted = Math.max(baseTime * timeReductionFactor, 10);
+
+            return {
+                length: length,
+                attempts: attempts,
+                baseTime: baseTimeAdjusted
+            };
+        }
+
+        function generateCombo(length) {
+            const shuffled = [...emojiSet].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, length);
+        }
+
+        function startNewGame() {
+            strikes = 0;
+            currentAttempt = 0;
+            const config = getLevelConfig(currentLevel);
+            secretCombo = generateCombo(config.length);
+            maxAttempts = config.attempts;
+            timeLeft = config.baseTime;
+            renderGame();
+            startTimer();
+            audio.playbackRate = 1;
+            audio.play();
+        }
+
+        function renderGame() {
+            const attemptsDiv = document.getElementById('attempts');
+            attemptsDiv.innerHTML = '';
+
+            for (let i = 0; i < maxAttempts; i++) {
+                const row = document.createElement('div');
+                row.className = 'row';
+                const config = getLevelConfig(currentLevel);
+                
+                for (let j = 0; j < config.length; j++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    if (i < currentAttempt) {
+                        cell.className += ' disabled';
+                    } else if (i === currentAttempt) {
+                        cell.draggable = true;
+                        cell.addEventListener('dragover', (e) => e.preventDefault());
+                        cell.addEventListener('drop', handleDrop);
+                    }
+                    row.appendChild(cell);
+                }
+                attemptsDiv.appendChild(row);
+            }
+
+            renderPalette();
+        }
+
+        function renderPalette() {
+            const paletteDiv = document.getElementById('palette');
+            paletteDiv.innerHTML = '';
+            const config = getLevelConfig(currentLevel);
+            const paletteSize = Math.min(config.length + 5, emojiSet.length); // Dynamic palette size
+            const shuffledEmojis = [...emojiSet].sort(() => 0.5 - Math.random());
+            shuffledEmojis.slice(0, paletteSize).forEach(emoji => {
+                const div = document.createElement('div');
+                div.className = 'palette-emoji';
+                div.textContent = emoji;
+                div.draggable = true;
+                div.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text', emoji);
+                });
+                paletteDiv.appendChild(div);
+            });
+        }
+
+        function handleDrop(e) {
+            e.preventDefault();
+            const emoji = e.dataTransfer.getData('text');
+            e.target.textContent = emoji;
+            checkRowComplete();
+        }
+
+        function checkRowComplete() {
+            const currentRow = document.getElementsByClassName('row')[currentAttempt];
+            const cells = currentRow.getElementsByClassName('cell');
+            const guess = Array.from(cells).map(cell => cell.textContent);
+            
+            if (!guess.includes('')) {
+                const correctPositions = guess.filter((emoji, i) => emoji === secretCombo[i]).length;
+                currentRow.insertAdjacentHTML('beforeend', `<span> (${correctPositions} correct)</span>`);
+                
+                if (correctPositions === secretCombo.length) {
+                    endGame(true);
+                } else {
+                    currentAttempt++;
+                    if (currentAttempt >= maxAttempts) {
+                        endGame(false);
+                    } else {
+                        renderGame();
+                        resetTimer();
+                    }
+                }
+            }
+        }
+
+        function startTimer() {
+            if (timerId) clearInterval(timerId);
+            const progressBar = document.getElementById('progress-bar');
+            const config = getLevelConfig(currentLevel);
+            const timeReduction = (config.baseTime - 10) / (maxAttempts - 1);
+            timeLeft = config.baseTime - (timeReduction * currentAttempt);
+
+            timerId = setInterval(() => {
+                timeLeft -= 0.1;
+                const percentage = (timeLeft / (config.baseTime - (timeReduction * currentAttempt))) * 100;
+                progressBar.style.width = `${percentage}%`;
+                
+                if (percentage > 66) progressBar.style.backgroundColor = 'green';
+                else if (percentage > 33) progressBar.style.backgroundColor = 'yellow';
+                else if (percentage > 10) progressBar.style.backgroundColor = 'orange';
+                else progressBar.style.backgroundColor = 'red';
+
+                audio.playbackRate = 1 + (1 - percentage / 100) * 0.5;
+
+                if (timeLeft <= 0) {
+                    strikes++;
+                    currentAttempt++;
+                    if (strikes >= 3 || currentAttempt >= maxAttempts) {
+                        endGame(false);
+                    } else {
+                        const row = document.getElementsByClassName('row')[currentAttempt - 1];
+                        row.className += ' disabled';
+                        renderGame();
+                        resetTimer();
+                    }
+                }
+            }, 100);
+        }
+
+        function resetTimer() {
+            clearInterval(timerId);
+            startTimer();
+        }
+
+        function endGame(won) {
+            clearInterval(timerId);
+            audio.pause();
+            
+            const score = won ? (currentLevel * 1000) / (currentAttempt + 1) : 0;
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('highScore', highScore);
+                const name = prompt('New High Score! Enter your name:');
+                document.getElementById('high-score').textContent = `${highScore} (${name})`;
+            }
+            
+            alert(won ? `You won Level ${currentLevel}! Score: ${score}` : 'Game Over!');
+            if (won) {
+                currentLevel++;
+                startNewGame();
+            }
+        }
+
+        startNewGame();
+    </script>
+</body>
+</html>
